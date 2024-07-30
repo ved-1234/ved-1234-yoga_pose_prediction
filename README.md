@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 
 # Yoga-Pose_Predict
 This repository contains code for a Flask web application that predicts yoga poses in images using machine learning models. It includes a YOLO model for keypoint detection and a custom PyTorch model for classification.
@@ -57,3 +58,6 @@ If you find this project interesting or useful feel free to connect with me on L
 
 
 
+=======
+# yoga_pose_prediction
+>>>>>>> origin/main
