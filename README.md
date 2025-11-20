@@ -15,7 +15,7 @@ This repository contains code for a Flask web application that predicts yoga pos
 
 
 ```
-  git clone https://github.com/AyushD95/Yoga-Pose_Predict.git
+ https://github.com/ved-1234/ved-1234-yoga_pose_prediction.git
 ```
 
 #### 2. Download Dataset:
