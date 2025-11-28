@@ -5,43 +5,12 @@ from ultralytics import YOLO
 import matplotlib.pyplot as plt
 import base64
 import io
-import requests
+from PIL import Image
 
 # ---------------------------------------------------------
-# HUGGINGFACE MODEL DOWNLOAD (Render Safe)
+# LIGHTWEIGHT YOLO MODEL (NO DOWNLOAD, NO OOM)
 # ---------------------------------------------------------
-HF_MODEL_URL = "https://huggingface.co/ved123456/yoga-pose-model/resolve/main/yolov8x-pose-p6.pt"
-MODEL_DIR = "models"
-MODEL_PATH = f"{MODEL_DIR}/yolov8x-pose-p6.pt"
-
-
-def download_model():
-    """Download YOLO pose model from HuggingFace if not present."""
-    if not os.path.exists(MODEL_DIR):
-        os.makedirs(MODEL_DIR)
-
-    if os.path.exists(MODEL_PATH):
-        print("✔ YOLO model already exists.")
-        return
-
-    print("⬇ Downloading YOLO model from HuggingFace...")
-
-    try:
-        with requests.get(HF_MODEL_URL, stream=True) as r:
-            r.raise_for_status()
-            with open(MODEL_PATH, "wb") as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-
-        print("✔ YOLO model downloaded successfully.")
-
-    except Exception as e:
-        print("❌ Failed to download model:", str(e))
-
-
-# Download YOLO once at startup
-download_model()
+MODEL_PATH = "https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n-pose.pt"
 
 # ---------------------------------------------------------
 # CLASS DICTIONARY
@@ -86,21 +55,22 @@ class YogaClassifier(torch.nn.Module):
 def load_classifier():
     """Load classification model safely."""
     model_pose = YogaClassifier(num_classes=len(classes_dict), input_length=32)
-
     state_dict = torch.load("best.pth", map_location="cpu", weights_only=True)
     model_pose.load_state_dict(state_dict)
-
     model_pose.eval()
     return model_pose
 
 
-# Load YOLO + classifier once at startup (MUCH faster)
+# ---------------------------------------------------------
+# LOAD MODELS ONCE
+# ---------------------------------------------------------
+print("Loading YOLOv8n-pose (Render Safe)...")
 yolo_model = YOLO(MODEL_PATH)
 classifier_model = load_classifier()
-
+print("Models loaded successfully!")
 
 # ---------------------------------------------------------
-# PREDICTION
+# PREDICTION PIPELINE
 # ---------------------------------------------------------
 def make_prediction(image_path):
     results = yolo_model.predict(image_path, verbose=False)
@@ -108,21 +78,18 @@ def make_prediction(image_path):
     for r in results:
         im_array = r.plot()
 
-        # Keypoints
         keypoints = r.keypoints.xyn.cpu().numpy()[0]
         keypoints = keypoints.reshape(1, -1)[0].tolist()
 
-        # Remove first two values (bbox)
         keypoints_tensor = torch.tensor(keypoints[2:], dtype=torch.float32).unsqueeze(0)
 
-        # Classifier
         with torch.no_grad():
             pred_logits = classifier_model(keypoints_tensor)
             pred = torch.softmax(pred_logits, dim=1).argmax().item()
 
         prediction = classes_dict[pred]
 
-        # Image with prediction text
+        # Plot image with prediction text
         image_bytes = io.BytesIO()
         plt.imshow(im_array[..., ::-1])
         plt.title(f"Prediction: {prediction}", color="green")
