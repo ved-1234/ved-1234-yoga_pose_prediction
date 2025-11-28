@@ -12,21 +12,28 @@ import gdown
 # -------------------------------
 def download_model():
     model_path = "models/yolov8x-pose-p6.pt"
-    FILE_ID = "1Up8eKUQHsNiEU7naRx5RW3OkLvmPTgy_"  # your file id
+    FILE_ID = "1Up8eKUQHsNiEU7naRx5RW3OkLvmPTgy_"
+    URL = f"https://drive.google.com/uc?id={FILE_ID}&export=download"
 
-    if not os.path.exists("models"):
-        os.makedirs("models")
+    # Create folder
+    os.makedirs("models", exist_ok=True)
 
+    # Download only if missing
     if not os.path.exists(model_path):
-        print("\nDownloading YOLO model using gdown...\n")
+        print("\n🔥 Downloading YOLO model from Google Drive...\n")
 
-        url = f"https://drive.google.com/uc?id={FILE_ID}"
+        try:
+            gdown.download(URL, model_path, quiet=False, fuzzy=True)
+        except Exception as e:
+            print("❌ ERROR downloading:", e)
 
-        gdown.download(url, model_path, quiet=False, fuzzy=True)
-
-        print("\nModel download completed.\n")
+        # Double check file exists
+        if not os.path.exists(model_path):
+            print("\n❌ Model download FAILED – Render blocked Google Drive.\n")
+        else:
+            print("\n✅ Model downloaded successfully.\n")
     else:
-        print("YOLO model already exists.")
+        print("✔ Model already exists.")
 
 # Download model at startup
 download_model()
