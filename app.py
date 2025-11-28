@@ -5,38 +5,30 @@ from ultralytics import YOLO
 import matplotlib.pyplot as plt
 import base64
 import io
-import requests
+import gdown
 
 # -------------------------------
-# GOOGLE DRIVE YOLO MODEL DOWNLOAD
+# GOOGLE DRIVE YOLO MODEL DOWNLOAD (USING GDOWN)
 # -------------------------------
 def download_model():
     model_path = "models/yolov8x-pose-p6.pt"
-
-    FILE_ID = "1Up8eKUQHsNiEU7naRx5RW3OkLvmPTgy_"
-    url = f"https://drive.google.com/uc?export=download&id={FILE_ID}"
+    FILE_ID = "1Up8eKUQHsNiEU7naRx5RW3OkLvmPTgy_"  # your file id
 
     if not os.path.exists("models"):
         os.makedirs("models")
 
     if not os.path.exists(model_path):
-        print("Downloading YOLO model from Google Drive...")
+        print("\nDownloading YOLO model using gdown...\n")
 
-        # Stream download (important for large files)
-        response = requests.get(url, stream=True)
-        response.raise_for_status()
+        url = f"https://drive.google.com/uc?id={FILE_ID}"
 
-        with open(model_path, "wb") as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    f.write(chunk)
+        gdown.download(url, model_path, quiet=False, fuzzy=True)
 
-        print("YOLO model downloaded successfully.")
+        print("\nModel download completed.\n")
     else:
         print("YOLO model already exists.")
 
-
-# Download the YOLO model at app start
+# Download model at startup
 download_model()
 
 
