@@ -5,43 +5,45 @@ from ultralytics import YOLO
 import matplotlib.pyplot as plt
 import base64
 import io
-import gdown
+import requests
 
-# -------------------------------
-# GOOGLE DRIVE YOLO MODEL DOWNLOAD (USING GDOWN)
-# -------------------------------
+# ---------------------------------------------------------
+# HUGGINGFACE MODEL DOWNLOAD (Render safe)
+# ---------------------------------------------------------
+HF_MODEL_URL = "https://huggingface.co/ved123456/yoga-pose-model/resolve/main/yolov8x-pose-p6.pt"
+MODEL_PATH = "models/yolov8x-pose-p6.pt"
+
+
 def download_model():
-    model_path = "models/yolov8x-pose-p6.pt"
-    FILE_ID = "1Up8eKUQHsNiEU7naRx5RW3OkLvmPTgy_"
-    URL = f"https://drive.google.com/uc?id={FILE_ID}&export=download"
+    """Download YOLO pose model from HuggingFace if not present."""
+    if not os.path.exists("models"):
+        os.makedirs("models")
 
-    # Create folder
-    os.makedirs("models", exist_ok=True)
+    if os.path.exists(MODEL_PATH):
+        print("✔ YOLO model already exists.")
+        return
 
-    # Download only if missing
-    if not os.path.exists(model_path):
-        print("\n🔥 Downloading YOLO model from Google Drive...\n")
+    print("⬇ Downloading YOLO model from HuggingFace...")
 
-        try:
-            gdown.download(URL, model_path, quiet=False, fuzzy=True)
-        except Exception as e:
-            print("❌ ERROR downloading:", e)
+    try:
+        with requests.get(HF_MODEL_URL, stream=True) as r:
+            r.raise_for_status()
+            with open(MODEL_PATH, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+        print("✔ YOLO model downloaded successfully.")
 
-        # Double check file exists
-        if not os.path.exists(model_path):
-            print("\n❌ Model download FAILED – Render blocked Google Drive.\n")
-        else:
-            print("\n✅ Model downloaded successfully.\n")
-    else:
-        print("✔ Model already exists.")
+    except Exception as e:
+        print("❌ Failed to download model:", str(e))
 
-# Download model at startup
+
+# Call download on startup
 download_model()
 
-
-# -------------------------------
+# ---------------------------------------------------------
 # CLASS DICTIONARY
-# -------------------------------
+# ---------------------------------------------------------
 classes_dict = {
     0: 'Adho Mukha Svanasana', 1: 'Adho Mukha Vrksasana', 2: 'Alanasana', 3: 'Anjaneyasana',
     4: 'Ardha Chandrasana', 5: 'Ardha Matsyendrasana', 6: 'Ardha Navasana',
@@ -60,10 +62,9 @@ classes_dict = {
     44: 'Virabhadrasana Three', 45: 'Virabhadrasana Two', 46: 'Vrksasana'
 }
 
-
-# -------------------------------
-# POSE CLASSIFIER MODEL
-# -------------------------------
+# ---------------------------------------------------------
+# POSE CLASSIFIER
+# ---------------------------------------------------------
 class YogaClassifier(torch.nn.Module):
     def __init__(self, num_classes, input_length):
         super(YogaClassifier, self).__init__()
@@ -82,17 +83,16 @@ class YogaClassifier(torch.nn.Module):
 
 def load_model():
     model_pose = YogaClassifier(num_classes=len(classes_dict), input_length=32)
-    model_pose.load_state_dict(torch.load("best.pth", map_location=torch.device("cpu")))
+    model_pose.load_state_dict(torch.load("best.pth", map_location="cpu"))
     model_pose.eval()
     return model_pose
 
 
-# -------------------------------
+# ---------------------------------------------------------
 # YOLO + CLASSIFIER PREDICTION
-# -------------------------------
+# ---------------------------------------------------------
 def make_prediction(model, image_path):
-
-    yolo_model = YOLO("models/yolov8x-pose-p6.pt")
+    yolo_model = YOLO(MODEL_PATH)
 
     results = yolo_model.predict(image_path, verbose=False)
 
@@ -105,37 +105,38 @@ def make_prediction(model, image_path):
         keypoints_tensor = torch.tensor(keypoints[2:], dtype=torch.float32).unsqueeze(0)
 
         with torch.no_grad():
-            logit = model(keypoints_tensor)
-            pred = torch.softmax(logit, dim=1).argmax(dim=1).item()
-            prediction = classes_dict[pred]
+            pred_logits = model(keypoints_tensor)
+            pred = torch.softmax(pred_logits, dim=1).argmax().item()
 
-        image = io.BytesIO()
+        prediction = classes_dict[pred]
+
+        image_bytes = io.BytesIO()
         plt.imshow(im_array[..., ::-1])
         plt.title(f"Prediction: {prediction}", color="green")
-        plt.savefig(image, format='png')
+        plt.savefig(image_bytes, format="png")
         plt.close()
 
-        image.seek(0)
-        plot_base64 = base64.b64encode(image.read()).decode('utf-8')
+        image_bytes.seek(0)
+        base64_img = base64.b64encode(image_bytes.read()).decode("utf-8")
 
-        return plot_base64, prediction
+        return base64_img, prediction
 
 
-# -------------------------------
+# ---------------------------------------------------------
 # FLASK APP
-# -------------------------------
+# ---------------------------------------------------------
 app = Flask(__name__)
 
 
-@app.route('/')
+@app.route("/")
 def home():
-    return render_template('index.html')
+    return render_template("index.html")
 
 
-@app.route('/prediction', methods=['POST'])
+@app.route("/prediction", methods=["POST"])
 def predict():
-    image_file = request.files['file']
-    image_path = 'temp.png'
+    image_file = request.files["file"]
+    image_path = "temp.png"
     image_file.save(image_path)
 
     model = load_model()
@@ -143,11 +144,14 @@ def predict():
 
     os.remove(image_path)
 
-    return render_template('prediction.html',
-                           prediction=prediction,
-                           plot_base64=plot_base64)
+    return render_template(
+        "prediction.html",
+        prediction=prediction,
+        plot_base64=plot_base64,
+    )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host="0.0.0.0", port=port)
+
