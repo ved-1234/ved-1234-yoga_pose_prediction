@@ -8,30 +8,37 @@ import io
 import requests
 
 # -------------------------------
-# GOOGLE DRIVE MODEL DOWNLOAD
+# GOOGLE DRIVE YOLO MODEL DOWNLOAD
 # -------------------------------
 def download_model():
     model_path = "models/yolov8x-pose-p6.pt"
 
     FILE_ID = "1Up8eKUQHsNiEU7naRx5RW3OkLvmPTgy_"
-
     url = f"https://drive.google.com/uc?export=download&id={FILE_ID}"
 
     if not os.path.exists("models"):
         os.makedirs("models")
 
     if not os.path.exists(model_path):
-        print("Downloading YOLO model...")
-        r = requests.get(url)
+        print("Downloading YOLO model from Google Drive...")
+
+        # Stream download (important for large files)
+        response = requests.get(url, stream=True)
+        response.raise_for_status()
+
         with open(model_path, "wb") as f:
-            f.write(r.content)
-        print("YOLO model saved successfully.")
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+
+        print("YOLO model downloaded successfully.")
     else:
         print("YOLO model already exists.")
 
 
-# Download YOLO model on startup
+# Download the YOLO model at app start
 download_model()
+
 
 # -------------------------------
 # CLASS DICTIONARY
@@ -86,7 +93,7 @@ def load_model():
 # -------------------------------
 def make_prediction(model, image_path):
 
-    yolo_model = YOLO("models/yolov8x-pose-p6.pt", weights_only=True)
+    yolo_model = YOLO("models/yolov8x-pose-p6.pt")
 
     results = yolo_model.predict(image_path, verbose=False)
 
